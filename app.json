@@ -1,0 +1,30 @@
+{
+    "expo": {
+        "name": "VesTrack",
+        "slug": "vestrack",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/Logo-Vestracker.png",
+        "userInterfaceStyle": "automatic",
+        "newArchEnabled": true,
+        "splash": {
+            "image": "./assets/Logo-Vestracker.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+        },
+        "ios": {
+            "supportsTablet": true
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/Logo-Vestracker.png",
+                "backgroundColor": "#ffffff"
+            },
+            "package": "com.branmarvel.vestrack"
+        },
+        "web": {
+            "favicon": "./assets/Logo-Vestracker.png",
+            "bundler": "metro"
+        }
+    }
+}
