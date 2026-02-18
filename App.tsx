@@ -17,6 +17,7 @@ const INITIAL_RATES: RateData = {
     binance_usdt_sell: 0,
     last_updated: 'Nunca',
     binance_offers: [],
+    binance_offers_type: 'BUY',
 };
 
 const THEME_KEY = '@vestrack_theme';
@@ -26,6 +27,8 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'rates' | 'calc'>('rates');
     const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
+    const [offersType, setOffersType] = useState<'BUY' | 'SELL'>('BUY');
+    const [customRateFromDashboard, setCustomRateFromDashboard] = useState<number | undefined>(undefined);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const viewRef = useRef(null);
 
@@ -54,10 +57,10 @@ export default function App() {
         }
     };
 
-    const loadRates = async (amountFilter?: number) => {
+    const loadRates = async (amountFilter?: number, type: 'BUY' | 'SELL' = 'BUY') => {
         setLoading(true);
         try {
-            const data = await getAllRates(amountFilter);
+            const data = await getAllRates(amountFilter, type);
             setRates(data);
         } catch (error) {
             console.error('Error loading rates:', error);
@@ -68,8 +71,15 @@ export default function App() {
     };
 
     useEffect(() => {
-        loadRates(minAmount);
-    }, [minAmount]);
+        loadRates(minAmount, offersType);
+    }, [minAmount, offersType]);
+
+    const handleCopyToCalc = (price: number) => {
+        setCustomRateFromDashboard(price);
+        setActiveTab('calc');
+        // Minimal delay to ensure tab switched before setting custom rate if needed
+        // or just rely on state props
+    };
 
     const handleShare = async () => {
         try {
@@ -105,13 +115,20 @@ export default function App() {
                         <RateDashboard
                             rates={rates}
                             loading={loading}
-                            onRefresh={() => loadRates(minAmount)}
+                            onRefresh={() => loadRates(minAmount, offersType)}
                             minAmount={minAmount}
-                            onFilterChange={setMinAmount}
+                            onFilterChange={(amt) => setMinAmount(amt)}
+                            onSetOffersType={(type) => setOffersType(type)}
+                            onCopyToCalc={handleCopyToCalc}
                             isDarkMode={isDarkMode}
                         />
                     ) : (
-                        <AdvancedCalculator rates={rates} onShare={handleShare} isDarkMode={isDarkMode} />
+                        <AdvancedCalculator
+                            rates={rates}
+                            onShare={handleShare}
+                            isDarkMode={isDarkMode}
+                            customRateFromDashboard={customRateFromDashboard}
+                        />
                     )}
                 </View>
             </ViewShot>

@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput, Linking, Platform } from 'react-native';
 import { RateData } from '../services/api';
-import { TrendingUp, TrendingDown, Clock, Info, Filter } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, Clock, Info, Filter, Copy, ExternalLink, ArrowRight } from 'lucide-react-native';
 
 interface RateDashboardProps {
     rates: RateData;
@@ -9,6 +9,8 @@ interface RateDashboardProps {
     onRefresh: () => void;
     minAmount?: number;
     onFilterChange: (amount: number | undefined) => void;
+    onSetOffersType: (type: 'BUY' | 'SELL') => void;
+    onCopyToCalc: (rate: number) => void;
     isDarkMode?: boolean;
 }
 
@@ -18,9 +20,22 @@ export const RateDashboard: React.FC<RateDashboardProps> = ({
     onRefresh,
     minAmount,
     onFilterChange,
+    onSetOffersType,
+    onCopyToCalc,
     isDarkMode = false
 }) => {
+    const [localMinAmount, setLocalMinAmount] = useState(minAmount?.toString() || '');
     const t = (light: string, dark: string) => isDarkMode ? dark : light;
+
+    const handleFilterSubmit = () => {
+        const val = parseFloat(localMinAmount);
+        onFilterChange(isNaN(val) ? undefined : val);
+    };
+
+    const openBinance = (price: number) => {
+        const url = 'https://p2p.binance.com/es-LA/trade/' + (rates.binance_offers_type === 'BUY' ? 'sell' : 'buy') + '/USDT?fiat=VES&payment=ALL';
+        Linking.openURL(url);
+    };
 
     return (
         <ScrollView
@@ -28,7 +43,7 @@ export const RateDashboard: React.FC<RateDashboardProps> = ({
             refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
         >
             <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Tasas Oficiales (BCV)</Text>
+                <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Banco Central (Oficial)</Text>
                 <View style={styles.lastUpdated}>
                     <Clock size={12} color={t("#64748b", "#94a3b8")} />
                     <Text style={[styles.updatedText, isDarkMode && styles.textSecondaryDark]}>{rates.last_updated}</Text>
@@ -37,92 +52,171 @@ export const RateDashboard: React.FC<RateDashboardProps> = ({
 
             <View style={styles.grid}>
                 <View style={[styles.card, styles.primaryCard, isDarkMode && styles.cardDark]}>
-                    <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Dólar (USD)</Text>
-                    <Text style={[styles.cardValue, isDarkMode && styles.textDark]}>{rates.bcv_usd.toFixed(2)} Bs</Text>
+                    <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>USD (Dólar)</Text>
+                    <Text style={[styles.cardValue, isDarkMode && styles.textDark]}>{rates.bcv_usd > 0 ? rates.bcv_usd.toFixed(2) : '---'} Bs</Text>
                     <View style={styles.badge}>
                         <TrendingUp size={14} color="#10b981" />
-                        <Text style={styles.badgeText}>Oficial</Text>
+                        <Text style={styles.badgeText}>BCV</Text>
                     </View>
                 </View>
                 <View style={[styles.card, isDarkMode && styles.cardDark]}>
-                    <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Euro (EUR)</Text>
-                    <Text style={[styles.cardValue, isDarkMode && styles.textDark]}>{rates.bcv_eur.toFixed(2)} Bs</Text>
+                    <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>EUR (Euro)</Text>
+                    <Text style={[styles.cardValue, isDarkMode && styles.textDark]}>{rates.bcv_eur > 0 ? rates.bcv_eur.toFixed(2) : '---'} Bs</Text>
+                    <View style={styles.badge}>
+                        <TrendingUp size={14} color="#10b981" />
+                        <Text style={styles.badgeText}>BCV</Text>
+                    </View>
                 </View>
             </View>
 
             <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Mercado P2P (Binance)</Text>
-                <TouchableOpacity onPress={() => onFilterChange(minAmount ? undefined : 100)}>
-                    <Filter size={18} color={minAmount ? "#3b82f6" : (isDarkMode ? "#94a3b8" : "#64748b")} />
-                </TouchableOpacity>
+                <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Binance P2P</Text>
+                <View style={styles.p2pToggle}>
+                    <TouchableOpacity
+                        onPress={() => onSetOffersType('BUY')}
+                        style={[styles.toggleBtn, rates.binance_offers_type === 'BUY' && styles.toggleBtnActive]}
+                    >
+                        <Text style={[styles.toggleText, rates.binance_offers_type === 'BUY' && styles.toggleTextActive]}>Compra</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => onSetOffersType('SELL')}
+                        style={[styles.toggleBtn, rates.binance_offers_type === 'SELL' && styles.toggleBtnActive]}
+                    >
+                        <Text style={[styles.toggleText, rates.binance_offers_type === 'SELL' && styles.toggleTextActive]}>Venta</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            <View style={[styles.p2pCard, isDarkMode && styles.cardDark]}>
+            <View style={[styles.filterContainer, isDarkMode && styles.filterContainerDark]}>
+                <Text style={[styles.filterLabel, isDarkMode && styles.textSecondaryDark]}>Filtrar por monto mínimo (Bs):</Text>
+                <View style={styles.filterRow}>
+                    <TextInput
+                        style={[styles.filterInput, isDarkMode && styles.filterInputDark, isDarkMode && styles.textDark]}
+                        placeholder="Ej: 500"
+                        placeholderTextColor={t("#94a3b8", "#475569")}
+                        keyboardType="numeric"
+                        value={localMinAmount}
+                        onChangeText={setLocalMinAmount}
+                        onBlur={handleFilterSubmit}
+                    />
+                    <TouchableOpacity style={styles.filterApply} onPress={handleFilterSubmit}>
+                        <ArrowRight size={18} color="#ffffff" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <View style={[styles.p2pSummary, isDarkMode && styles.cardDark]}>
                 <View style={styles.p2pRow}>
-                    <View>
-                        <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Venta (Recibes)</Text>
-                        <Text style={[styles.p2pValue, isDarkMode && styles.textDark]}>{rates.binance_usdt_sell.toFixed(2)} Bs</Text>
+                    <View style={styles.p2pCol}>
+                        <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Pagas (Compra)</Text>
+                        <Text style={[styles.p2pValue, { color: '#ef4444' }]}>{rates.binance_usdt_buy.toFixed(2)}</Text>
                     </View>
                     <View style={styles.divider} />
-                    <View>
-                        <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Compra (Pagas)</Text>
-                        <Text style={[styles.p2pValue, isDarkMode && styles.textDark]}>{rates.binance_usdt_buy.toFixed(2)} Bs</Text>
+                    <View style={styles.p2pCol}>
+                        <Text style={[styles.cardLabel, isDarkMode && styles.textSecondaryDark]}>Recibes (Venta)</Text>
+                        <Text style={[styles.p2pValue, { color: '#10b981' }]}>{rates.binance_usdt_sell.toFixed(2)}</Text>
                     </View>
                 </View>
             </View>
 
-            <Text style={[styles.subTitle, isDarkMode && styles.textDark]}>Mejores Ofertas P2P</Text>
+            <Text style={[styles.subTitle, isDarkMode && styles.textDark]}>
+                Mejores Ofertas para {rates.binance_offers_type === 'BUY' ? 'Comprar' : 'Vender'}
+            </Text>
+
+            {rates.binance_offers.length === 0 && !loading && (
+                <View style={styles.emptyState}>
+                    <Info size={24} color={t("#94a3b8", "#475569")} />
+                    <Text style={[styles.emptyText, isDarkMode && styles.textSecondaryDark]}>No hay ofertas para este monto.</Text>
+                </View>
+            )}
+
             {rates.binance_offers.map((offer, index) => (
                 <View key={index} style={[styles.offerCard, isDarkMode && styles.cardDark]}>
                     <View style={styles.offerHeader}>
-                        <Text style={[styles.advertiser, isDarkMode && styles.textDark]}>{offer.advertiser}</Text>
-                        <Text style={styles.offerPrice}>{offer.price.toFixed(2)} Bs</Text>
+                        <View>
+                            <Text style={[styles.advertiser, isDarkMode && styles.textDark]}>{offer.advertiser}</Text>
+                            <Text style={[styles.limitText, isDarkMode && styles.textSecondaryDark]}>Lím: {offer.minAmount} - {offer.maxAmount} Bs</Text>
+                        </View>
+                        <Text style={[styles.offerPrice, { color: rates.binance_offers_type === 'BUY' ? '#ef4444' : '#10b981' }]}>
+                            {offer.price.toFixed(2)}
+                        </Text>
                     </View>
-                    <View style={styles.offerDetails}>
-                        <Text style={[styles.limitText, isDarkMode && styles.textSecondaryDark]}>Límites: {offer.minAmount} - {offer.maxAmount} VES</Text>
+                    <View style={styles.offerActions}>
+                        <TouchableOpacity
+                            style={[styles.actionBtn, isDarkMode && styles.actionBtnDark]}
+                            onPress={() => onCopyToCalc(offer.price)}
+                        >
+                            <Copy size={16} color="#3b82f6" />
+                            <Text style={styles.actionText}>Usar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.actionBtn, isDarkMode && styles.actionBtnDark]}
+                            onPress={() => openBinance(offer.price)}
+                        >
+                            <ExternalLink size={16} color={t("#64748b", "#94a3b8")} />
+                            <Text style={[styles.actionText, { color: t("#64748b", "#94a3b8") }]}>Binance</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             ))}
 
-            <View style={{ height: 40 }} />
+            <View style={{ height: 60 }} />
         </ScrollView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20 },
+    container: { flex: 1, padding: 16 },
     containerDark: { backgroundColor: '#0f172a' },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, marginTop: 10 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 },
     sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
     lastUpdated: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     updatedText: { fontSize: 11, color: '#64748b', fontWeight: '500' },
-    grid: { flexDirection: 'row', gap: 15, marginBottom: 25 },
+    grid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
     card: {
         flex: 1,
         backgroundColor: '#ffffff',
-        padding: 16,
+        padding: 14,
         borderRadius: 20,
-        boxShadow: '0px 4px 6px rgba(0,0,0,0.02)', // RN handle this via shadowing usually, but we keep it for reference
         borderWidth: 1,
-        borderColor: '#f1f5f9'
+        borderColor: '#f1f5f9',
+        elevation: 1
     },
     cardDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
     primaryCard: { borderColor: '#dbeafe', backgroundColor: '#f0f9ff' },
-    cardLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 6 },
-    cardValue: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
-    badge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-    badgeText: { fontSize: 10, fontWeight: '700', color: '#059669', textTransform: 'uppercase' },
-    p2pCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, marginBottom: 25, borderWidth: 1, borderColor: '#f1f5f9' },
-    p2pRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-    divider: { width: 1, height: 40, backgroundColor: '#f1f5f9' },
-    p2pValue: { fontSize: 22, fontWeight: '900', color: '#3b82f6' },
-    subTitle: { fontSize: 15, fontWeight: '700', color: '#1e293b', marginBottom: 12 },
-    offerCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#f1f5f9' },
-    offerHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-    advertiser: { fontSize: 14, fontWeight: '600', color: '#334155' },
-    offerPrice: { fontSize: 16, fontWeight: '800', color: '#10b981' },
-    offerDetails: { flexDirection: 'row', justifyContent: 'space-between' },
+    cardLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', marginBottom: 4, textTransform: 'uppercase' },
+    cardValue: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
+    badge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+    badgeText: { fontSize: 10, fontWeight: '800', color: '#059669' },
+    p2pToggle: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4 },
+    toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    toggleBtnActive: { backgroundColor: '#ffffff', elevation: 2 },
+    toggleText: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+    toggleTextActive: { color: '#3b82f6' },
+    filterContainer: { marginBottom: 20, backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#f1f5f9' },
+    filterContainerDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+    filterLabel: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 10 },
+    filterRow: { flexDirection: 'row', gap: 10 },
+    filterInput: { flex: 1, backgroundColor: '#f8fafc', height: 44, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, fontWeight: '600' },
+    filterInputDark: { backgroundColor: '#0f172a' },
+    filterApply: { width: 44, height: 44, backgroundColor: '#3b82f6', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    p2pSummary: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' },
+    p2pRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    p2pCol: { flex: 1, alignItems: 'center' },
+    divider: { width: 1, height: 30, backgroundColor: '#f1f5f9' },
+    p2pValue: { fontSize: 22, fontWeight: '900' },
+    subTitle: { fontSize: 15, fontWeight: '800', color: '#1e293b', marginBottom: 12 },
+    offerCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#f1f5f9' },
+    offerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+    advertiser: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 2 },
+    offerPrice: { fontSize: 18, fontWeight: '900' },
     limitText: { fontSize: 11, color: '#94a3b8' },
+    offerActions: { flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#f8fafc', paddingVertical: 8, borderRadius: 10 },
+    actionBtnDark: { backgroundColor: '#0f172a' },
+    actionText: { fontSize: 12, fontWeight: '700', color: '#3b82f6' },
     textDark: { color: '#f8fafc' },
     textSecondaryDark: { color: '#94a3b8' },
+    emptyState: { padding: 40, alignItems: 'center', gap: 10 },
+    emptyText: { color: '#94a3b8', fontSize: 14, fontWeight: '500' }
 });

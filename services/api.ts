@@ -10,10 +10,11 @@ export interface BinanceOffer {
 export interface RateData {
     bcv_usd: number;
     bcv_eur: number;
-    binance_usdt_buy: number;
-    binance_usdt_sell: number;
+    binance_usdt_buy: number;  // Price to PAY (Buy USDT)
+    binance_usdt_sell: number; // Price to RECEIVE (Sell USDT)
     last_updated: string;
     binance_offers: BinanceOffer[];
+    binance_offers_type: 'BUY' | 'SELL';
 }
 
 const BINANCE_P2P_URL = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search';
@@ -39,7 +40,8 @@ const fetchWithProxy = async (url: string, options: any = {}) => {
         return response;
     } catch (e) {
         console.warn('Primary proxy failed, trying fallback...');
-        return fetch(`${PROXIES[1]}${encodeURIComponent(url)}`, options);
+        const secondProxy = PROXIES[1];
+        return fetch(`${secondProxy}${encodeURIComponent(url)}`, options);
     }
 };
 
@@ -83,7 +85,7 @@ export const fetchBinanceOffers = async (type: 'BUY' | 'SELL', minAmount?: numbe
                 tradeType: type,
                 asset: 'USDT',
                 page: 1,
-                rows: 5,
+                rows: 10,
                 transAmount: minAmount || null,
                 payTypes: [],
             }),
@@ -116,36 +118,56 @@ export const fetchHistoricalBCV = async (date: string): Promise<number> => {
 };
 
 export const fetchBCVRates = async (): Promise<{ usd: number; eur: number }> => {
+    let usd = 0;
+    let eur = 0;
+
+    // Try rafniXg API first (Primary source)
     try {
         const apiResponse = await fetchWithProxy(BCV_API_URL);
         const apiData = await apiResponse.json();
-        let usd = apiData.dollar || 0;
 
-        const response = await fetchWithProxy(BCV_URL);
-        const html = await response.text();
+        // The API returns an object with rates directly or nested
+        // Adjusting based on standard response pattern for bcv-api
+        usd = apiData.usd || apiData.USD || apiData.dollar || 0;
+        eur = apiData.eur || apiData.EUR || apiData.euro || 0;
 
-        const usdMatch = html.match(/<div id="dolar"[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/);
-        const eurMatch = html.match(/<div id="euro"[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/);
-
-        const scrapedUsd = usdMatch ? parseFloat(usdMatch[1].replace(',', '.')) : 0;
-        const scrapedEur = eurMatch ? parseFloat(eurMatch[1].replace(',', '.')) : 0;
-
-        return {
-            usd: usd || scrapedUsd,
-            eur: scrapedEur,
-        };
-    } catch (error) {
-        console.error('Error fetching BCV rates:', error);
-        return { usd: 0, eur: 0 };
+        console.log('BCV API Success:', { usd, eur });
+    } catch (e) {
+        console.warn('BCV API primary failed, trying secondary scraping...');
     }
+
+    // Secondary: Scraping as fallback
+    if (usd === 0 || eur === 0) {
+        try {
+            const response = await fetchWithProxy(BCV_URL);
+            const html = await response.text();
+
+            const usdMatch = html.match(/<div id="dolar"[^>]*>[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/i);
+            const eurMatch = html.match(/<div id="euro"[^>]*>[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/i);
+
+            if (usdMatch) usd = parseFloat(usdMatch[1].replace(',', '.'));
+            if (eurMatch) eur = parseFloat(eurMatch[1].replace(',', '.'));
+
+            console.log('BCV Scraping Fallback Success:', { usd, eur });
+        } catch (error) {
+            console.error('All BCV sources failed:', error);
+        }
+    }
+
+    return { usd, eur };
 };
 
-export const getAllRates = async (minAmount?: number): Promise<RateData> => {
+function scrapedIsNewer(val: string): boolean {
+    // Simple logic: if we have a value, we can use it
+    return !!val;
+}
+
+export const getAllRates = async (minAmount?: number, offersType: 'BUY' | 'SELL' = 'BUY'): Promise<RateData> => {
     const [binanceBuy, binanceSell, bcv, offers] = await Promise.all([
         fetchBinanceRate('BUY', minAmount),
         fetchBinanceRate('SELL', minAmount),
         fetchBCVRates(),
-        fetchBinanceOffers('BUY', minAmount),
+        fetchBinanceOffers(offersType, minAmount),
     ]);
 
     return {
@@ -155,5 +177,6 @@ export const getAllRates = async (minAmount?: number): Promise<RateData> => {
         binance_usdt_sell: binanceSell,
         last_updated: new Date().toLocaleTimeString(),
         binance_offers: offers,
+        binance_offers_type: offersType
     };
 };
