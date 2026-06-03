@@ -8,16 +8,16 @@ Para iniciar el servidor de desarrollo:
 
 ```bash
 # Iniciar con opciones básicas
-npx expo start
+pnpm expo start
 
 # Forzar plataforma web
-npx expo start --web
+pnpm expo start --web
 
 # Forzar plataforma android (requiere emulador o dispositivo conectado)
-npx expo start --android
+pnpm expo start --android
 
 # Limpiar caché si hay errores extraños
-npx expo start -c
+pnpm expo start -c
 ```
 
 ---
@@ -65,28 +65,30 @@ npx expo export --platform web
 ### Gestión de Dependencias
 ```bash
 # Instalar nuevas dependencias (asegura compatibilidad con Expo)
-npx expo install nombre-del-paquete
+pnpm expo install nombre-del-paquete
 
 # Verificar dependencias
-npx expo install --check
+pnpm expo install --check
 ```
 
 ### Configuración inicial de EAS
 ```bash
 # Configurar el proyecto por primera vez
-eas build:configure
+pnpm eas build:configure
 ```
 
 ### Logs y Depuración
 ```bash
 # Ver logs de un build en curso (nube)
-eas build:list
+pnpm eas build:list
 ```
 
 ---
 
 ## 💡 Notas Importantes
 
+- **Gestor de Paquetes**: Este proyecto utiliza `pnpm` para la instalación de dependencias y scripts de ejecución.
+- **Seguridad (Edad Mínima de Paquetes)**: Con el fin de evitar ataques a la cadena de suministro (supply chain attacks), el proyecto está configurado para no descargar paquetes o versiones que tengan menos de **10 días** de haber sido publicados. Esta protección está activa en `pnpm-workspace.yaml` y `.npmrc` (`minimumReleaseAge` de 14400 minutos).
 - **Profile `preview`**: Está configurado en `eas.json` para generar un **APK** instalable directamente.
 - **Profile `production`**: Generalmente genera un **AAB** para la Google Play Store.
 - **CORS**: En la versión web, usamos un proxy para BCV. Si los cambios no se ven, asegúrate de refrescar el navegador.
