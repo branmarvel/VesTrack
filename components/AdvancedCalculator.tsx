@@ -4,6 +4,7 @@ import { RateData } from '../services/api';
 import { ArrowLeftRight, Share2, DollarSign, Euro, Landmark, TrendingUp, ArrowDownUp, Info, X } from 'lucide-react-native';
 import { Numpad } from './Numpad';
 import * as Haptics from 'expo-haptics';
+import { convertCurrency, CurrencyType, RateSourceType } from '../utils/currency';
 
 interface AdvancedCalculatorProps {
     rates: RateData;
@@ -11,8 +12,6 @@ interface AdvancedCalculatorProps {
     customRateFromDashboard?: number;
     isDarkMode?: boolean;
 }
-
-export type CurrencyType = 'ves' | 'usd' | 'eur';
 
 export const AdvancedCalculator: React.FC<AdvancedCalculatorProps> = ({
     rates,
@@ -45,31 +44,9 @@ export const AdvancedCalculator: React.FC<AdvancedCalculatorProps> = ({
 
     const t = (light: string, dark: string) => isDarkMode ? dark : light;
 
-    // Core conversion function used for everything (including the modal)
-    const convert = (val: number, base: CurrencyType, target: CurrencyType, via: 'binance'|'bcv_usd'|'bcv_eur'|'custom') => {
-        let inVes = 0;
-        
-        // 1. Convert to VES first
-        if (base === 'ves') inVes = val;
-        else if (base === 'usd') {
-            if (via === 'binance') inVes = val * binanceRate;
-            else if (via === 'custom') inVes = val * activeCustomRate;
-            else inVes = val * rates.bcv_usd; 
-        } else if (base === 'eur') {
-            inVes = val * rates.bcv_eur; // Assume EUR conversion via BCV
-        }
-
-        // 2. Convert from VES to target
-        if (target === 'ves') return inVes;
-        if (target === 'usd') {
-            if (via === 'binance') return binanceRate > 0 ? inVes / binanceRate : 0;
-            if (via === 'custom') return activeCustomRate > 0 ? inVes / activeCustomRate : 0;
-            return rates.bcv_usd > 0 ? inVes / rates.bcv_usd : 0;
-        }
-        if (target === 'eur') {
-            return rates.bcv_eur > 0 ? inVes / rates.bcv_eur : 0;
-        }
-        return 0;
+    // Core conversion function using the pure modular utility
+    const convert = (val: number, base: CurrencyType, target: CurrencyType, via: RateSourceType) => {
+        return convertCurrency(val, base, target, via, rates, activeCustomRate, binanceRate);
     };
 
     const handleModeSwitch = (newMode: 'selling' | 'buying') => {
