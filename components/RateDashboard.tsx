@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput, Linking, Platform, LayoutAnimation } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { RateData } from '../services/api';
 import { TrendingUp, TrendingDown, Clock, Info, Filter, Copy, ExternalLink, ArrowRight } from 'lucide-react-native';
 
@@ -12,6 +13,7 @@ interface RateDashboardProps {
     onSetOffersType: (type: 'BUY' | 'SELL') => void;
     onCopyToCalc: (rate: number) => void;
     isDarkMode?: boolean;
+    isOffline?: boolean;
 }
 
 export const RateDashboard: React.FC<RateDashboardProps> = ({
@@ -22,17 +24,25 @@ export const RateDashboard: React.FC<RateDashboardProps> = ({
     onFilterChange,
     onSetOffersType,
     onCopyToCalc,
-    isDarkMode = false
+    isDarkMode = false,
+    isOffline = false
 }) => {
     const [localMinAmount, setLocalMinAmount] = useState(minAmount?.toString() || '');
     const t = (light: string, dark: string) => isDarkMode ? dark : light;
 
     const handleFilterSubmit = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const val = parseFloat(localMinAmount);
         onFilterChange(isNaN(val) ? undefined : val);
     };
 
+    const handleToggle = (type: 'BUY' | 'SELL') => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        onSetOffersType(type);
+    };
+
     const openBinance = (price: number) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const url = 'https://p2p.binance.com/es-LA/trade/' + (rates.binance_offers_type === 'BUY' ? 'sell' : 'buy') + '/USDT?fiat=VES&payment=ALL';
         Linking.openURL(url);
     };
@@ -73,13 +83,13 @@ export const RateDashboard: React.FC<RateDashboardProps> = ({
                 <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>Binance P2P</Text>
                 <View style={styles.p2pToggle}>
                     <TouchableOpacity
-                        onPress={() => onSetOffersType('BUY')}
+                        onPress={() => handleToggle('BUY')}
                         style={[styles.toggleBtn, rates.binance_offers_type === 'BUY' && styles.toggleBtnActive]}
                     >
                         <Text style={[styles.toggleText, rates.binance_offers_type === 'BUY' && styles.toggleTextActive]}>Compra</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        onPress={() => onSetOffersType('SELL')}
+                        onPress={() => handleToggle('SELL')}
                         style={[styles.toggleBtn, rates.binance_offers_type === 'SELL' && styles.toggleBtnActive]}
                     >
                         <Text style={[styles.toggleText, rates.binance_offers_type === 'SELL' && styles.toggleTextActive]}>Venta</Text>
