@@ -126,31 +126,52 @@ export const fetchBCVRates = async (): Promise<{ usd: number; eur: number }> => 
         const apiResponse = await fetchWithProxy(BCV_API_URL);
         const apiData = await apiResponse.json();
 
-        // The API returns an object with rates directly or nested
-        // Adjusting based on standard response pattern for bcv-api
         usd = apiData.usd || apiData.USD || apiData.dollar || 0;
         eur = apiData.eur || apiData.EUR || apiData.euro || 0;
 
         console.log('BCV API Success:', { usd, eur });
     } catch (e) {
-        console.warn('BCV API primary failed, trying secondary scraping...');
+        console.warn('BCV API primary failed, trying secondary DolarAPI...');
     }
 
-    // Secondary: Scraping as fallback
+    // Secondary: DolarAPI (Highly reliable JSON fallback)
+    if (usd === 0 || eur === 0) {
+        try {
+            console.log('Fetching from DolarAPI...');
+            const [usdRes, eurRes] = await Promise.all([
+                fetch('https://ve.dolarapi.com/v1/dolares/oficial').catch(() => null),
+                fetch('https://ve.dolarapi.com/v1/euros/oficial').catch(() => null)
+            ]);
+            
+            if (usdRes && usdRes.ok && usd === 0) {
+                const usdData = await usdRes.json();
+                if (usdData && usdData.promedio) usd = usdData.promedio;
+            }
+            if (eurRes && eurRes.ok && eur === 0) {
+                const eurData = await eurRes.json();
+                if (eurData && eurData.promedio) eur = eurData.promedio;
+            }
+            console.log('DolarAPI Fallback Success:', { usd, eur });
+        } catch (error) {
+            console.warn('DolarAPI secondary failed, trying tertiary scraping...', error);
+        }
+    }
+
+    // Tertiary: Scraping as fallback (ONLY if we still lack USD or EUR)
     if (usd === 0 || eur === 0) {
         try {
             const response = await fetchWithProxy(BCV_URL);
             const html = await response.text();
 
-            const usdMatch = html.match(/<div id="dolar"[^>]*>[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/i);
-            const eurMatch = html.match(/<div id="euro"[^>]*>[\s\S]*?<strong>\s*([\d,.]+)\s*<\/strong>/i);
+            const usdMatch = html.match(/<div id="dolar"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>\s*([\d,.]+)\s*<\/strong>/i);
+            const eurMatch = html.match(/<div id="euro"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>\s*([\d,.]+)\s*<\/strong>/i);
 
-            if (usdMatch) usd = parseFloat(usdMatch[1].replace(',', '.'));
-            if (eurMatch) eur = parseFloat(eurMatch[1].replace(',', '.'));
+            if (usdMatch && usd === 0) usd = parseFloat(usdMatch[1].replace(',', '.'));
+            if (eurMatch && eur === 0) eur = parseFloat(eurMatch[1].replace(',', '.'));
 
             console.log('BCV Scraping Fallback Success:', { usd, eur });
         } catch (error) {
-            console.error('All BCV sources failed:', error);
+            console.error('Scraping BCV tertiary failed (can happen on Android without proxy):', error instanceof Error ? error.message : error);
         }
     }
 
