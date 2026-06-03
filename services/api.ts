@@ -163,8 +163,8 @@ export const fetchBCVRates = async (): Promise<{ usd: number; eur: number }> => 
             const response = await fetchWithProxy(BCV_URL);
             const html = await response.text();
 
-            const usdMatch = html.match(/<div id="dolar"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>\s*([\d,.]+)\s*<\/strong>/i);
-            const eurMatch = html.match(/<div id="euro"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>\s*([\d,.]+)\s*<\/strong>/i);
+            const usdMatch = html.match(/<div id="dolar"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>[^<]*?([\d,.]+)[^<]*?<\/strong>/i);
+            const eurMatch = html.match(/<div id="euro"[^>]*>[\s\S]*?centrado[^>]*>\s*<strong>[^<]*?([\d,.]+)[^<]*?<\/strong>/i);
 
             if (usdMatch && usd === 0) usd = parseFloat(usdMatch[1].replace(',', '.'));
             if (eurMatch && eur === 0) eur = parseFloat(eurMatch[1].replace(',', '.'));
